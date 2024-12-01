@@ -16,7 +16,6 @@ java {
 repositories {
 	maven { url 'https://repo.spring.io/milestone' }
 	mavenCentral()
-	mavenLocal()
 }
 
 ext {
@@ -37,8 +36,6 @@ dependencies {
 	implementation 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 
-	// 로컬 저장소에서 mylibrary 의존성 추가
-	implementation 'practice.example:api-response-library:1.0.0'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'io.projectreactor:reactor-test'
