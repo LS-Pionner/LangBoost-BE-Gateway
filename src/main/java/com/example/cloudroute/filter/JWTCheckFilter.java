@@ -31,9 +31,9 @@ public class JWTCheckFilter implements GatewayFilter {
             ));
         }
 
-        // 토큰이 존재하는 경우
+        // 토큰이 존재하는 경우 토큰 검증
         String token = bearer.substring("Bearer ".length());
-        VerifyResult result = jwtUtil.verify(token);  // DI된 jwtUtil 사용
+        VerifyResult result = jwtUtil.verify(token);
 
         if (result.isSuccess()) {
             // 토큰이 유효한 경우, VerifyResult를 ServerWebExchange에 저장하여 후속 필터에서 사용
