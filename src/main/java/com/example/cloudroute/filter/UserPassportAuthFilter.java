@@ -16,17 +16,21 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import reactor.core.publisher.Mono;
+import org.springframework.beans.factory.annotation.Value;
 
 @Slf4j
 @Component
 public class UserPassportAuthFilter implements GatewayFilter {
 
+
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
-    public UserPassportAuthFilter(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
-        this.webClient = webClientBuilder.baseUrl("http://localhost:8080").build();
+
+    public UserPassportAuthFilter(WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
+                                  @Value("${backend.user.url}") String baseUrl) {
         this.objectMapper = objectMapper;
+        this.webClient = webClientBuilder.baseUrl(baseUrl).build();  // 생성자에서 유저 서버 url을 인자로 받음
     }
 
     @Override
