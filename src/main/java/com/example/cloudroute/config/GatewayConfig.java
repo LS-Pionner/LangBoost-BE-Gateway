@@ -3,6 +3,7 @@ package com.example.cloudroute.config;
 import com.example.cloudroute.filter.AddPassportHeaderFilter;
 import com.example.cloudroute.filter.JWTCheckFilter;
 //import com.example.cloudroute.filter.RedisUsernameCheckFilter;
+import com.example.cloudroute.filter.RedisUsernameCheckFilter;
 import com.example.cloudroute.filter.UserPassportAuthFilter;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,7 +17,7 @@ public class GatewayConfig {
     private final JWTCheckFilter jwtCheckFilter;
     private final UserPassportAuthFilter userPassportAuthFilter;
     private final AddPassportHeaderFilter addPassportHeaderFilter;
-//    private final RedisUsernameCheckFilter redisUsernameCheckFilter;
+    private final RedisUsernameCheckFilter redisUsernameCheckFilter;
 
     @Value("${backend.user.url}")
     private String userUrl;  // 인증 관련 경로 URI 주입
@@ -24,11 +25,11 @@ public class GatewayConfig {
     @Value("${backend.core.url}")
     private String coreUrl;  // /api/v1 경로 URI 주입
 
-    public GatewayConfig(JWTCheckFilter jwtCheckFilter, UserPassportAuthFilter userPassportAuthFilter, AddPassportHeaderFilter addPassportHeaderFilter) {
+    public GatewayConfig(JWTCheckFilter jwtCheckFilter, UserPassportAuthFilter userPassportAuthFilter, AddPassportHeaderFilter addPassportHeaderFilter, RedisUsernameCheckFilter redisUsernameCheckFilter) {
         this.jwtCheckFilter = jwtCheckFilter;
         this.userPassportAuthFilter = userPassportAuthFilter;
         this.addPassportHeaderFilter = addPassportHeaderFilter;
-//        this.redisUsernameCheckFilter = redisUsernameCheckFilter;
+        this.redisUsernameCheckFilter = redisUsernameCheckFilter;
     }
 
     @Bean
@@ -44,7 +45,7 @@ public class GatewayConfig {
                         .path("/api/v1/**")  // /api/v1 경로로 요청
                         .filters(f -> f
                                 .filter(jwtCheckFilter)  // JWTCheckFilter 적용
-//                                .filter(redisUsernameCheckFilter)
+                                .filter(redisUsernameCheckFilter)
                                 .filter(userPassportAuthFilter)
                                 .filter(addPassportHeaderFilter)
                         )
