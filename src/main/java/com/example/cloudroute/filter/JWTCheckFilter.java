@@ -3,6 +3,7 @@ package com.example.cloudroute.filter;
 import com.example.cloudroute.dto.VerifyResult;
 import com.example.cloudroute.response.ErrorCode;
 import com.example.cloudroute.security.JWTUtil;
+import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -12,7 +13,10 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 @Component
+@AllArgsConstructor
 public class JWTCheckFilter implements GatewayFilter {
+
+    private final JWTUtil jwtUtil;  // JWTUtil 주입 필드 선언
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -27,9 +31,9 @@ public class JWTCheckFilter implements GatewayFilter {
             ));
         }
 
-        // 토큰이 존재하는 경우
+        // 토큰이 존재하는 경우 토큰 검증
         String token = bearer.substring("Bearer ".length());
-        VerifyResult result = JWTUtil.verify(token);
+        VerifyResult result = jwtUtil.verify(token);
 
         if (result.isSuccess()) {
             // 토큰이 유효한 경우, VerifyResult를 ServerWebExchange에 저장하여 후속 필터에서 사용

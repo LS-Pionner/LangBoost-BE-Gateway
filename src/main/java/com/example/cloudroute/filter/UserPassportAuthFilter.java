@@ -4,7 +4,7 @@ import com.example.cloudroute.dto.ApiResponse;
 import com.example.cloudroute.dto.Passport;
 import com.example.cloudroute.dto.VerifyResult;
 import com.example.cloudroute.response.ErrorCode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.cloudroute.util.RedisUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
@@ -12,25 +12,37 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
-import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import reactor.core.publisher.Mono;
+import org.springframework.beans.factory.annotation.Value;
 
 @Slf4j
 @Component
 public class UserPassportAuthFilter implements GatewayFilter {
 
-    private final WebClient webClient;
-    private final ObjectMapper objectMapper;
 
-    public UserPassportAuthFilter(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
-        this.webClient = webClientBuilder.baseUrl("http://localhost:8080").build();
-        this.objectMapper = objectMapper;
+    private final WebClient webClient;
+    private final RedisUtil redisUtil;
+
+
+    public UserPassportAuthFilter(WebClient.Builder webClientBuilder, RedisUtil redisUtil,
+                                  @Value("${backend.user.url}") String baseUrl) {
+        this.redisUtil = redisUtil;
+        this.webClient = webClientBuilder.baseUrl(baseUrl).build();  // 생성자에서 유저 서버 url을 인자로 받음
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        // exchange에서 'passport' 키 값을 확인
+        if (exchange.getAttributes().containsKey("passport")) {
+            // 'passport' 키 값이 있으면 다음 필터로 바로 넘어감
+            return chain.filter(exchange);
+        }
+
+        // 'passport' 키 값이 없으면 다른 처리를 하거나, 필요한 경우 추가 작업을 수행
+        log.info("No passport found in the exchange attributes. Proceeding with further logic.");
+
         // VerifyResult 가져오기
         VerifyResult verifyResult = (VerifyResult) exchange.getAttributes().get("verifyResult");
 
@@ -49,39 +61,20 @@ public class UserPassportAuthFilter implements GatewayFilter {
                 .bodyValue(verifyResult)
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<ApiResponse<Passport>>() {})
-                .map(apiResponse -> apiResponse.payload())  // payload만 추출
+                .map(apiResponse -> apiResponse.payload())  // payload만 추출 (Passport dto 존재)
                 .doOnSubscribe(subscription -> log.info("Sending authentication request to user server with VerifyResult: {}", verifyResult))
                 .doOnSuccess(passport -> log.info("Authentication successful. Received Passport: {}", passport))
                 .flatMap(passport -> {
                     try {
-                        // 원래 요청에서 Authorization 헤더의 기존 값 확인
-                        String originalAuthorizationHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
-                        log.info("Original Authorization header value: {}", originalAuthorizationHeader);
+                        log.info("Passport object from the user server: {}", passport);
 
-                        // Passport 객체에서 userId 추출
-                        Long userId = passport.userId();
-                        String authorizationHeader = String.valueOf(userId); // userId만 사용
-                        log.info("Generated Authorization header with userId: {}", authorizationHeader);
+                        exchange.getAttributes().put("passport", passport);
 
-                        // Passport 객체를 JSON 형식으로 직렬화 (직렬화 예시)
-                        String passportJson = objectMapper.writeValueAsString(passport);
-                        log.info("Serialized Passport object: {}", passportJson);
+                        // redis에 key: email, value: userId로 저장
+                        long durationInSeconds = 30 * 60;  // 30분을 초로 변환
+                        redisUtil.setDataExpire("auth:" + passport.email(), String.valueOf(passport.userId()), durationInSeconds);
 
-                        // 요청에 x-passport 헤더 추가
-                        ServerHttpRequest request = exchange.getRequest()
-                                .mutate()
-                                .header("x-passport", passportJson)  // Passport 객체를 JSON으로 직렬화한 값을 헤더에 추가
-                                .build();
-
-                        // 새로운 ServerWebExchange 객체 생성
-                        ServerWebExchange modifiedExchange = exchange.mutate().request(request).build();
-
-                        // 수정된 요청 헤더 출력
-                        log.info("Added x-passport header to request: {}", modifiedExchange.getRequest().getHeaders().get("x-passport"));
-
-                        // 변경된 exchange 전달
-                        return chain.filter(modifiedExchange);
-
+                        return chain.filter(exchange);
                     } catch (Exception e) {
                         log.error("Failed to process Authorization header: {}", e.getMessage(), e);
                         return Mono.error(new ResponseStatusException(
